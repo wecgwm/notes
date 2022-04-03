@@ -146,13 +146,13 @@ InnoDB 在创建聚簇索引时，会根据不同的场景选择不同的列作�
 
 ## 事务隔离级别
 
-- **READ-UNCOMMITTED(读取未提交)：** 所有事务都可以看到其他未提交事务的执行结果，**可能会导致脏读、幻读或不可重复读**。
+- **READ-UNCOMMITTED(读取未提交)：** 所有事务都可以看到其他未提交事务的执行结果，可能会导致脏读、幻读或不可重复读。
 
-- **READ-COMMITTED(读取已提交)：** 个事务只能看见已经提交事务所做的改变。**可以阻止脏读，但是幻读或不可重复读仍有可能发生**。
+- **READ-COMMITTED(读取已提交)：** 事务只能看见已经提交事务所做的改变。可以阻止脏读，但是幻读或不可重复读仍有可能发生。
 
-- **REPEATABLE-READ(可重复读)：** 对同一字段的多次读取结果都是一致的，除非数据是被本身事务自己所修改，**可以阻止脏读和不可重复读，但幻读仍有可能发生**。（ InnoDB 默认使用隔离级别）
+- **REPEATABLE-READ(可重复读)：** 对同一字段的多次读取结果都是一致的，**除非数据是被本身事务自己所修改**，可以阻止脏读和不可重复读，但幻读仍有可能发生。（ InnoDB 默认使用隔离级别）
 
-- **SERIALIZABLE(可串行化)：** 最高的隔离级别，它通过强制事务排序依次逐个执行，使之不可能相互冲突，从而解决幻读问题。简言之，它是在每个读的数据行上加上共享锁。在这个级别，可能导致大量的超时现象和锁竞争。该级别可以防止脏读、不可重复读以及幻读。（ **分布式事务** 的情况下会用到该隔离级别。）
+- **SERIALIZABLE(可串行化)：** 最高的隔离级别，它通过强制事务排序依次逐个执行，使之不可能相互冲突，从而解决幻读问题。简言之，它是在每个读的数据行上加上共享锁。在这个级别，可能导致大量的超时现象和锁竞争。该级别可以防止脏读、不可重复读以及幻读。（ 分布式事务 的情况下会用到该隔离级别。）
 
 ## 快照读
 
@@ -164,7 +164,7 @@ InnoDB 在创建聚簇索引时，会根据不同的场景选择不同的列作�
 
 ### InnoDB对MVCC的实现
 
-> `MVCC` 的实现依赖于：**隐藏字段、Read View、undo log**。在内部实现中，`InnoDB` 通过数据行的 `DB_TRX_ID` 和 `Read View` 来判断数据的可见性，如不可见，则通过数据行的 `DB_ROLL_PTR` 找到 `undo log` 中的历史版本。每个事务读到的数据版本可能是不一样的，在同一个事务中，**用户只能看到该事务创建 `Read View` 之前已经提交的修改和该事务本身做的修改**
+> `MVCC` 的实现依赖于：**隐藏字段、Read View、undo log**。在内部实现中，`InnoDB` 通过数据行的 `DB_TRX_ID` 和 `Read View` 来判断数据的可见性，如不可见，则通过数据行的 `DB_ROLL_PTR` 找到 `undo log` 中的历史版本继续判断。每个事务读到的数据版本可能是不一样的，在同一个事务中，**用户只能看到该事务创建 `Read View` 之前已经提交的修改和该事务本身做的修改**
 > 隐藏字段
 
 **Read View包含字段:**
@@ -200,7 +200,7 @@ InnoDB 在创建聚簇索引时，会根据不同的场景选择不同的列作�
 > `undo log` 主要有两个作用：
 >
 > - 当事务回滚时用于将数据恢复到修改前的样子
-> - 另一个作用是 `MVCC` ，当读取记录时，若该记录被其他事务占用或当前版本对该事务不可见，则可以通过 `undo log` 读取之前的版本数据，以此实现非锁定读
+> - 另一个作用是 `MVCC` ，当读取记录时，**若该记录被其他事务占用或当前版本对该事务不可见**，则可以通过 `undo log` 读取之前的版本数据，以此实现非锁定读
 
 ### RC 和 RR 隔离级别下 MVCC 的差异
 
@@ -242,7 +242,7 @@ InnoDB 在创建聚簇索引时，会根据不同的场景选择不同的列作�
 
 
 
-> MySQL的 RR Isolation 的实现采用的是 [Snapshot Islolation](https://medium.com/@chester.yw.chu/複習資料庫的-isolation-level-與常見的五個-race-conditions-圖解-16e8d472a25c)。如果瞭解 Snapshot Isolation 的機制，就可以知道 Snapshot Isolation 在 read-only Transaction 中才可以避免 Phantom，但是像在像上面的例子使用的 read-write Transaction 中，就有可能出現 Phantom，進而導致 Write Skew。
+> MySQL的 RR Isolation 的实现采用的是 [Snapshot Islolation](https://medium.com/@chester.yw.chu/複習資料庫的-isolation-level-與常見的五個-race-conditions-圖解-16e8d472a25c)。如果瞭解 Snapshot Isolation 的機制，就可以知道 Snapshot Isolation 在 **read-only Transaction 中才可以避免 Phantom，但是像在像上面的例子使用的 read-write Transaction 中，就有可能出現 Phantom**，進而導致 Write Skew。
 > >Snapshot isolation avoids phantoms in read-only queries, but in read-write transactions, phantoms can lead to particularly tricky cases of write skew.
 >
 > Snapshot Isolation 會在每個 Transaction 第一次 SELECT 資料的時候，記錄下一個概念上像是時間標記的資料，每個 Transaction 在執行完第一次 SELECT 之後，Transaction 就只允許讀取:
@@ -391,7 +391,7 @@ InnoDB 在创建聚簇索引时，会根据不同的场景选择不同的列作�
 
 - redo log 是 InnoDB 引擎特有的；binlog 是 MySQL 的 Server 层实现的，所有引擎都可以使用。
 - redo log 是物理日志，记录的是“在某个数据页上做了什么修改”；binlog 是逻辑日志，记录的是这个语句的原始逻辑，比如“给 ID=2 这一行的 c 字段加 1 ”。
-- redo log 是循环写的，空间固定会用完；binlog 是可以追加写入的。“追加写”是指 binlog 文件写到一定大小后会切换到下一个，并不会覆盖以前的日志。
+- redo log 是循环写的，空间固定会用完；binlog 是可以追加写入的。“追加写”是指 binlog 文件写到一定大小后会切换到下一个，**并不会覆盖以前的日志**。
 
 ## 两阶段提交
 
